@@ -116,6 +116,7 @@ export function renderContact(main) {
     '<h2 id="contact-heading" class="contact-section-heading no-auto-ads">ارسل لنا رسالة</h2>' +
     '<div class="contact-grid">' +
     '<div class="contact-form-card contact-reveal" data-contact-delay="100">' +
+    '<div class="contact-form-stage">' +
     '<div id="contact-form-wrap" class="contact-form-wrap">' +
     '<form id="contact-form" class="contact-form no-auto-ads" novalidate data-endpoint="' +
     esc(CONFIG.formEndpoint) +
@@ -129,7 +130,7 @@ export function renderContact(main) {
     '<input id="cf-name" name="name" type="text" autocomplete="name" class="cf-control" placeholder=" " required>' +
     '<label for="cf-name" class="cf-float-label">الاسم</label>' +
     '</div>' +
-    '<p id="err-name" class="cf-error" role="alert" hidden></p>' +
+    '<p id="err-name" class="cf-error"></p>' +
     '</div>' +
     '<div class="cf-group" id="cf-phone-group">' +
     '<div class="cf-phone-shell" id="cf-phone-shell">' +
@@ -150,14 +151,14 @@ export function renderContact(main) {
     countryOptionsHtml +
     '</ul>' +
     '</div>' +
-    '<p id="err-phone" class="cf-error" role="alert" hidden></p>' +
+    '<p id="err-phone" class="cf-error"></p>' +
     '</div>' +
     '<div class="cf-group">' +
     '<div class="cf-float-field" data-float-field="email">' +
     '<input id="cf-email" name="email" type="email" autocomplete="email" class="cf-control" placeholder=" ">' +
     '<label for="cf-email" class="cf-float-label">البريد الإلكتروني</label>' +
     '</div>' +
-    '<p id="err-email" class="cf-error" role="alert" hidden></p>' +
+    '<p id="err-email" class="cf-error"></p>' +
     '</div>' +
     '<div class="cf-group">' +
     '<div class="cf-float-field" data-float-field="message">' +
@@ -165,7 +166,7 @@ export function renderContact(main) {
     '<label for="cf-message" class="cf-float-label">رسالتك</label>' +
     '</div>' +
     '<div class="cf-field-footer">' +
-    '<p id="err-message" class="cf-error" role="alert" hidden></p>' +
+    '<p id="err-message" class="cf-error"></p>' +
     '<span id="cf-char-counter" class="cf-char-counter tabular" dir="ltr" aria-live="off">0 / 500</span>' +
     '</div>' +
     '</div>' +
@@ -175,12 +176,13 @@ export function renderContact(main) {
     '</div>' +
     '</form>' +
     '</div>' +
-    '<div id="contact-success-state" class="contact-success-state" role="status" aria-live="polite" hidden>' +
+    '<div id="contact-success-state" class="contact-success-state" role="status" aria-live="polite" aria-hidden="true" inert tabindex="-1">' +
     '<div class="contact-success-badge" aria-hidden="true">' +
     checkIcon +
     '</div>' +
     '<p class="contact-success-text">تم إرسال رسالتك. سنرد عليك قريبًا.</p>' +
     '<button type="button" id="contact-reset-btn" class="contact-reset-btn">إرسال رسالة أخرى</button>' +
+    '</div>' +
     '</div>' +
     '</div>' +
     '<div class="contact-photo-card contact-reveal">' +
@@ -341,8 +343,7 @@ export function renderContact(main) {
   }
 
   function clearFieldError(f) {
-    f.err.textContent = '';
-    f.err.hidden = true;
+    f.err.replaceChildren();
     f.input.removeAttribute('aria-invalid');
     f.input.removeAttribute('aria-describedby');
     if (f.key === 'phone' && phoneShell) phoneShell.classList.remove('is-invalid');
@@ -456,21 +457,27 @@ export function renderContact(main) {
   let successTimer = null;
   function showSuccessState() {
     if (isReducedMotion()) {
-      formWrap.hidden = true;
-      successState.hidden = false;
+      formWrap.classList.add('is-state-hidden');
+      formWrap.setAttribute('aria-hidden', 'true');
+      formWrap.setAttribute('inert', '');
+      successState.removeAttribute('aria-hidden');
+      successState.removeAttribute('inert');
       successState.classList.add('is-visible');
-      resetBtn.focus();
+      resetBtn.focus({ preventScroll: true });
       return;
     }
     formWrap.classList.add('is-fading-out');
     clearTimeout(successTimer);
     successTimer = window.setTimeout(() => {
-      formWrap.hidden = true;
+      formWrap.classList.add('is-state-hidden');
       formWrap.classList.remove('is-fading-out');
-      successState.hidden = false;
+      formWrap.setAttribute('aria-hidden', 'true');
+      formWrap.setAttribute('inert', '');
+      successState.removeAttribute('aria-hidden');
+      successState.removeAttribute('inert');
       requestAnimationFrame(() => {
         successState.classList.add('is-visible');
-        resetBtn.focus();
+        resetBtn.focus({ preventScroll: true });
       });
     }, 190);
   }
@@ -497,8 +504,10 @@ export function renderContact(main) {
         msg = 'أدخل بريدًا إلكترونيًا صحيحًا';
       }
       if (msg) {
-        f.err.textContent = msg;
-        f.err.hidden = false;
+        const alertSpan = document.createElement('span');
+        alertSpan.setAttribute('role', 'alert');
+        alertSpan.textContent = msg;
+        f.err.replaceChildren(alertSpan);
         f.input.setAttribute('aria-invalid', 'true');
         f.input.setAttribute('aria-describedby', f.err.id);
         if (f.key === 'phone' && phoneShell) phoneShell.classList.add('is-invalid');
@@ -525,9 +534,12 @@ export function renderContact(main) {
     });
     updateCharCounter();
     successState.classList.remove('is-visible');
-    successState.hidden = true;
-    formWrap.hidden = false;
-    document.getElementById('cf-name').focus();
+    successState.setAttribute('aria-hidden', 'true');
+    successState.setAttribute('inert', '');
+    formWrap.classList.remove('is-state-hidden');
+    formWrap.removeAttribute('aria-hidden');
+    formWrap.removeAttribute('inert');
+    document.getElementById('cf-name').focus({ preventScroll: true });
   });
 
   return 'تواصل معنا | سفريتي';

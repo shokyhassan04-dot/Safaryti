@@ -319,14 +319,24 @@ html.no-motion .contact-reveal {
     grid-row: 1;
   }
 }
+.contact-form-stage {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  flex: 1;
+  min-width: 0;
+}
 .contact-form-wrap {
+  grid-area: 1 / 1;
   display: flex;
   flex-direction: column;
-  flex: 1;
-  transition: opacity 200ms var(--ease-out), transform 200ms var(--ease-out);
+  min-width: 0;
+  transition: opacity 200ms var(--ease-out), transform 200ms var(--ease-out), visibility 0s;
 }
-.contact-form-wrap[hidden] {
-  display: none !important;
+.contact-form-wrap.is-state-hidden {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 200ms var(--ease-out), transform 200ms var(--ease-out), visibility 0s linear 200ms;
 }
 .contact-form-wrap.is-fading-out {
   opacity: 0;
@@ -577,6 +587,7 @@ html.no-motion .contact-reveal {
   font-size: .8125rem;
   font-weight: 600;
   line-height: 1.4;
+  min-height: 1.25rem;
 }
 .cf-char-counter {
   font-size: .75rem;
@@ -622,24 +633,27 @@ html.no-motion .contact-reveal {
 
 /* Success state */
 .contact-success-state {
+  grid-area: 1 / 1;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   text-align: center;
   gap: 1rem;
-  flex: 1;
+  min-width: 0;
   padding-block: 2.5rem;
   opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
   transform: translateY(8px);
-  transition: opacity 250ms var(--ease-out), transform 250ms var(--ease-out);
+  transition: opacity 250ms var(--ease-out), transform 250ms var(--ease-out), visibility 0s linear 250ms;
 }
 .contact-success-state.is-visible {
   opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
   transform: translateY(0);
-}
-.contact-success-state[hidden] {
-  display: none !important;
+  transition: opacity 250ms var(--ease-out), transform 250ms var(--ease-out), visibility 0s;
 }
 .contact-success-badge {
   width: 3rem;
@@ -700,6 +714,11 @@ html.no-js .cf-phone-input {
   padding-block: .65rem;
 }
 
+html.no-motion .contact-form-wrap,
+html.no-motion .contact-success-state {
+  transition: none !important;
+  animation: none !important;
+}
 @media (prefers-reduced-motion: reduce) {
   .contact-reveal,
   .cf-float-label,
