@@ -232,6 +232,7 @@ export default defineConfig(() => {
             }
           };
           collectChunkTree(contactChunkFile, contactJsDeps, contactCssDeps);
+          collectChunkTree(scrollChunkFile, contactJsDeps, contactCssDeps);
           collectChunkTree(searchChunkFile, searchJsDeps, searchCssDeps);
           collectChunkTree(cultureChunkFile, cultureJsDeps, cultureCssDeps);
           collectChunkTree(archiveChunkFile, archiveJsDeps, archiveCssDeps);

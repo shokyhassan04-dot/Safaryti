@@ -96,6 +96,7 @@ export function renderContact(main) {
         alt: contactImgAlt,
         loading: 'eager',
         decoding: 'async',
+        fetchpriority: 'auto',
         referrerpolicy: 'no-referrer',
         sizes: '(min-width: 1024px) 480px, 92vw',
       })
@@ -147,9 +148,7 @@ export function renderContact(main) {
     '<input id="cf-phone" name="phone" type="tel" inputmode="tel" dir="ltr" class="cf-phone-input" placeholder="+20 000 000 0000" required>' +
     '<label for="cf-phone" class="cf-float-label">الموبايل</label>' +
     '</div>' +
-    '<ul id="cf-country-listbox" class="cf-country-listbox" role="listbox" aria-label="قائمة الدول العربية" hidden>' +
-    countryOptionsHtml +
-    '</ul>' +
+    '<ul id="cf-country-listbox" class="cf-country-listbox" role="listbox" aria-label="قائمة الدول العربية" hidden></ul>' +
     '</div>' +
     '<p id="err-phone" class="cf-error"></p>' +
     '</div>' +
@@ -260,59 +259,6 @@ export function renderContact(main) {
     '</div>' +
     '</section>';
 
-  activateAdSlots(main);
-
-  const contactPhotoImg = document.getElementById('contact-photo-img');
-  if (contactPhotoImg) {
-    contactPhotoImg.addEventListener(
-      'error',
-      () => {
-        contactPhotoImg.hidden = true;
-      },
-      { once: true }
-    );
-  }
-  function wireFlagFallbacks(scope) {
-    scope.querySelectorAll('.cf-flag-img').forEach((imgEl) => {
-      if (imgEl.dataset.fallbackWired) return;
-      imgEl.dataset.fallbackWired = '1';
-      const replaceWithChip = () => {
-        const chip = document.createElement('span');
-        chip.className = 'cf-flag-chip';
-        chip.textContent = imgEl.getAttribute('data-iso') || 'EG';
-        if (imgEl.parentNode) imgEl.parentNode.replaceChild(chip, imgEl);
-      };
-      imgEl.addEventListener('error', replaceWithChip, { once: true });
-      if (imgEl.complete && imgEl.naturalWidth === 0) replaceWithChip();
-    });
-  }
-  wireFlagFallbacks(main);
-
-  const revealEls = Array.prototype.slice.call(main.querySelectorAll('.contact-reveal'));
-  if (isReducedMotion() || !('IntersectionObserver' in window)) {
-    revealEls.forEach((el) => {
-      el.classList.add('is-revealed');
-    });
-  } else {
-    const revObs = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            entry.target.classList.add('is-revealed');
-            revObs.unobserve(entry.target);
-          }
-        });
-      },
-      { threshold: 0.08 }
-    );
-    revealEls.forEach((el) => {
-      revObs.observe(el);
-    });
-    registerCleanup(() => {
-      revObs.disconnect();
-    });
-  }
-
   const form = document.getElementById('contact-form');
   const formWrap = document.getElementById('contact-form-wrap');
   const successState = document.getElementById('contact-success-state');
@@ -349,197 +295,273 @@ export function renderContact(main) {
     if (f.key === 'phone' && phoneShell) phoneShell.classList.remove('is-invalid');
   }
 
-  fields.forEach((f) => {
-    syncFloatState(f.input);
-    f.input.addEventListener('input', () => {
-      syncFloatState(f.input);
-      if (f.key === 'message') updateCharCounter();
-      if (f.input.getAttribute('aria-invalid') === 'true') {
-        clearFieldError(f);
-      }
-    });
-    f.input.addEventListener('change', () => {
-      syncFloatState(f.input);
-    });
-  });
-  updateCharCounter();
-
-  const countryBtn = document.getElementById('cf-country-btn');
-  const countryListbox = document.getElementById('cf-country-listbox');
-  const countryFlagSlot = document.getElementById('cf-country-flag');
-  const countryDialSlot = document.getElementById('cf-country-dial');
-  const countryOptionEls = Array.prototype.slice.call(countryListbox.querySelectorAll('[role="option"]'));
-  let focusedOptIdx = 0;
-
-  function setSelectedCountry(iso) {
-    const found = ARAB_COUNTRIES.filter((c) => c.iso === iso)[0] || ARAB_COUNTRIES[0];
-    selectedCountry = found;
-    countryFlagSlot.innerHTML = renderFlagHtml(found.iso);
-    wireFlagFallbacks(countryFlagSlot);
-    countryDialSlot.innerHTML = '<bdi dir="ltr">' + esc(found.dial) + '</bdi>';
-    document.getElementById('cf-phone').setAttribute('placeholder', found.dial + ' 000 000 0000');
-    countryOptionEls.forEach((opt, idx) => {
-      const isMatch = opt.getAttribute('data-country-iso') === found.iso;
-      opt.setAttribute('aria-selected', isMatch ? 'true' : 'false');
-      if (isMatch) focusedOptIdx = idx;
+  function wireFlagFallbacks(scope) {
+    scope.querySelectorAll('.cf-flag-img').forEach((imgEl) => {
+      if (imgEl.dataset.fallbackWired) return;
+      imgEl.dataset.fallbackWired = '1';
+      const replaceWithChip = () => {
+        const chip = document.createElement('span');
+        chip.className = 'cf-flag-chip';
+        chip.textContent = imgEl.getAttribute('data-iso') || 'EG';
+        if (imgEl.parentNode) imgEl.parentNode.replaceChild(chip, imgEl);
+      };
+      imgEl.addEventListener('error', replaceWithChip, { once: true });
+      if (imgEl.complete && imgEl.naturalWidth === 0) replaceWithChip();
     });
   }
-
-  function highlightOption(idx) {
-    focusedOptIdx = (idx + countryOptionEls.length) % countryOptionEls.length;
-    countryOptionEls.forEach((opt, i) => {
-      opt.classList.toggle('is-focused', i === focusedOptIdx);
-    });
-    const activeOpt = countryOptionEls[focusedOptIdx];
-    if (activeOpt) {
-      countryListbox.setAttribute('aria-activedescendant', activeOpt.id);
-      activeOpt.scrollIntoView({ block: 'nearest' });
-    }
-  }
-
-  function closeCountryList(returnFocus) {
-    countryListbox.hidden = true;
-    countryBtn.setAttribute('aria-expanded', 'false');
-    countryOptionEls.forEach((opt) => {
-      opt.classList.remove('is-focused');
-    });
-    if (returnFocus) countryBtn.focus();
-  }
-
-  function openCountryList() {
-    countryListbox.hidden = false;
-    countryBtn.setAttribute('aria-expanded', 'true');
-    highlightOption(focusedOptIdx);
-  }
-
-  countryBtn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    if (countryListbox.hidden) openCountryList();
-    else closeCountryList(false);
-  });
-
-  countryBtn.addEventListener('keydown', (e) => {
-    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-      e.preventDefault();
-      if (countryListbox.hidden) {
-        openCountryList();
-      } else {
-        highlightOption(focusedOptIdx + (e.key === 'ArrowDown' ? 1 : -1));
-      }
-    } else if (e.key === 'Enter' || e.key === ' ') {
-      if (!countryListbox.hidden) {
-        e.preventDefault();
-        const opt = countryOptionEls[focusedOptIdx];
-        if (opt) setSelectedCountry(opt.getAttribute('data-country-iso'));
-        closeCountryList(true);
-      }
-    } else if (e.key === 'Escape' && !countryListbox.hidden) {
-      e.preventDefault();
-      closeCountryList(true);
-    }
-  });
-
-  countryOptionEls.forEach((opt) => {
-    opt.addEventListener('click', (e) => {
-      e.stopPropagation();
-      setSelectedCountry(opt.getAttribute('data-country-iso'));
-      closeCountryList(true);
-    });
-  });
-
-  function onDocClick(e) {
-    if (!countryListbox.hidden && !phoneShell.contains(e.target)) {
-      closeCountryList(false);
-    }
-  }
-  document.addEventListener('click', onDocClick);
 
   let successTimer = null;
-  function showSuccessState() {
-    if (isReducedMotion()) {
-      formWrap.classList.add('is-state-hidden');
-      formWrap.setAttribute('aria-hidden', 'true');
-      formWrap.setAttribute('inert', '');
-      successState.removeAttribute('aria-hidden');
-      successState.removeAttribute('inert');
-      successState.classList.add('is-visible');
-      resetBtn.focus({ preventScroll: true });
-      return;
-    }
-    formWrap.classList.add('is-fading-out');
-    clearTimeout(successTimer);
-    successTimer = window.setTimeout(() => {
-      formWrap.classList.add('is-state-hidden');
-      formWrap.classList.remove('is-fading-out');
-      formWrap.setAttribute('aria-hidden', 'true');
-      formWrap.setAttribute('inert', '');
-      successState.removeAttribute('aria-hidden');
-      successState.removeAttribute('inert');
-      requestAnimationFrame(() => {
-        successState.classList.add('is-visible');
-        resetBtn.focus({ preventScroll: true });
-      });
-    }, 190);
-  }
+  let rafId = 0;
+  let idleId = 0;
+  let idleTimer = 0;
+  let docClickWired = false;
+  let interactiveReady = false;
+  let countryListbox = document.getElementById('cf-country-listbox');
+  let onDocClick = null;
 
-  registerCleanup(() => {
-    document.removeEventListener('click', onDocClick);
-    clearTimeout(successTimer);
-  });
+  function initContactInteractive() {
+    if (interactiveReady) return;
+    interactiveReady = true;
+    form.removeEventListener('pointerdown', initContactInteractive, true);
+    form.removeEventListener('focusin', initContactInteractive, true);
+    form.removeEventListener('submit', initContactInteractive, true);
 
-  form.addEventListener('submit', (e) => {
-    e.preventDefault();
-    if (hpInput && hpInput.value.trim()) {
-      showSuccessState();
-      return;
+    activateAdSlots(main);
+
+    const contactPhotoImg = document.getElementById('contact-photo-img');
+    if (contactPhotoImg) {
+      contactPhotoImg.addEventListener(
+        'error',
+        () => {
+          contactPhotoImg.hidden = true;
+        },
+        { once: true }
+      );
     }
-    let firstInvalid = null;
+
+    const countryBtn = document.getElementById('cf-country-btn');
+    countryListbox = document.getElementById('cf-country-listbox');
+    countryListbox.innerHTML = countryOptionsHtml;
+    wireFlagFallbacks(main);
 
     fields.forEach((f) => {
-      const val = f.input.value.trim();
-      let msg = '';
-      if (f.required && !val) {
-        msg = 'هذا الحقل مطلوب';
-      } else if (f.key === 'email' && val && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(val)) {
-        msg = 'أدخل بريدًا إلكترونيًا صحيحًا';
-      }
-      if (msg) {
-        const alertSpan = document.createElement('span');
-        alertSpan.setAttribute('role', 'alert');
-        alertSpan.textContent = msg;
-        f.err.replaceChildren(alertSpan);
-        f.input.setAttribute('aria-invalid', 'true');
-        f.input.setAttribute('aria-describedby', f.err.id);
-        if (f.key === 'phone' && phoneShell) phoneShell.classList.add('is-invalid');
-        if (!firstInvalid) firstInvalid = f.input;
-      } else {
-        clearFieldError(f);
-      }
-    });
-
-    if (firstInvalid) {
-      firstInvalid.focus();
-      return;
-    }
-
-    showSuccessState();
-  });
-
-  resetBtn.addEventListener('click', () => {
-    form.reset();
-    setSelectedCountry('eg');
-    fields.forEach((f) => {
-      clearFieldError(f);
       syncFloatState(f.input);
+      f.input.addEventListener('input', () => {
+        syncFloatState(f.input);
+        if (f.key === 'message') updateCharCounter();
+        if (f.input.getAttribute('aria-invalid') === 'true') {
+          clearFieldError(f);
+        }
+      });
+      f.input.addEventListener('change', () => {
+        syncFloatState(f.input);
+      });
     });
     updateCharCounter();
-    successState.classList.remove('is-visible');
-    successState.setAttribute('aria-hidden', 'true');
-    successState.setAttribute('inert', '');
-    formWrap.classList.remove('is-state-hidden');
-    formWrap.removeAttribute('aria-hidden');
-    formWrap.removeAttribute('inert');
-    document.getElementById('cf-name').focus({ preventScroll: true });
+
+    const countryFlagSlot = document.getElementById('cf-country-flag');
+    const countryDialSlot = document.getElementById('cf-country-dial');
+    const countryOptionEls = Array.prototype.slice.call(countryListbox.querySelectorAll('[role="option"]'));
+    let focusedOptIdx = 0;
+
+    function setSelectedCountry(iso) {
+      const found = ARAB_COUNTRIES.filter((c) => c.iso === iso)[0] || ARAB_COUNTRIES[0];
+      selectedCountry = found;
+      countryFlagSlot.innerHTML = renderFlagHtml(found.iso);
+      wireFlagFallbacks(countryFlagSlot);
+      countryDialSlot.innerHTML = '<bdi dir="ltr">' + esc(found.dial) + '</bdi>';
+      document.getElementById('cf-phone').setAttribute('placeholder', found.dial + ' 000 000 0000');
+      countryOptionEls.forEach((opt, idx) => {
+        const isMatch = opt.getAttribute('data-country-iso') === found.iso;
+        opt.setAttribute('aria-selected', isMatch ? 'true' : 'false');
+        if (isMatch) focusedOptIdx = idx;
+      });
+    }
+
+    function highlightOption(idx) {
+      focusedOptIdx = (idx + countryOptionEls.length) % countryOptionEls.length;
+      countryOptionEls.forEach((opt, i) => {
+        opt.classList.toggle('is-focused', i === focusedOptIdx);
+      });
+      const activeOpt = countryOptionEls[focusedOptIdx];
+      if (activeOpt) {
+        countryListbox.setAttribute('aria-activedescendant', activeOpt.id);
+        activeOpt.scrollIntoView({ block: 'nearest' });
+      }
+    }
+
+    function closeCountryList(returnFocus) {
+      countryListbox.hidden = true;
+      countryBtn.setAttribute('aria-expanded', 'false');
+      countryOptionEls.forEach((opt) => {
+        opt.classList.remove('is-focused');
+      });
+      if (returnFocus) countryBtn.focus();
+    }
+
+    function openCountryList() {
+      countryListbox.hidden = false;
+      countryBtn.setAttribute('aria-expanded', 'true');
+      highlightOption(focusedOptIdx);
+    }
+
+    countryBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (countryListbox.hidden) openCountryList();
+      else closeCountryList(false);
+    });
+
+    countryBtn.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (countryListbox.hidden) {
+          openCountryList();
+        } else {
+          highlightOption(focusedOptIdx + (e.key === 'ArrowDown' ? 1 : -1));
+        }
+      } else if (e.key === 'Enter' || e.key === ' ') {
+        if (!countryListbox.hidden) {
+          e.preventDefault();
+          const opt = countryOptionEls[focusedOptIdx];
+          if (opt) setSelectedCountry(opt.getAttribute('data-country-iso'));
+          closeCountryList(true);
+        }
+      } else if (e.key === 'Escape' && !countryListbox.hidden) {
+        e.preventDefault();
+        closeCountryList(true);
+      }
+    });
+
+    countryOptionEls.forEach((opt) => {
+      opt.addEventListener('click', (e) => {
+        e.stopPropagation();
+        setSelectedCountry(opt.getAttribute('data-country-iso'));
+        closeCountryList(true);
+      });
+    });
+
+    onDocClick = (e) => {
+      if (!countryListbox.hidden && !phoneShell.contains(e.target)) {
+        closeCountryList(false);
+      }
+    };
+    document.addEventListener('click', onDocClick);
+    docClickWired = true;
+
+    function showSuccessState() {
+      if (isReducedMotion()) {
+        formWrap.classList.add('is-state-hidden');
+        formWrap.setAttribute('aria-hidden', 'true');
+        formWrap.setAttribute('inert', '');
+        successState.removeAttribute('aria-hidden');
+        successState.removeAttribute('inert');
+        successState.classList.add('is-visible');
+        resetBtn.focus({ preventScroll: true });
+        return;
+      }
+      formWrap.classList.add('is-fading-out');
+      clearTimeout(successTimer);
+      successTimer = window.setTimeout(() => {
+        formWrap.classList.add('is-state-hidden');
+        formWrap.classList.remove('is-fading-out');
+        formWrap.setAttribute('aria-hidden', 'true');
+        formWrap.setAttribute('inert', '');
+        successState.removeAttribute('aria-hidden');
+        successState.removeAttribute('inert');
+        requestAnimationFrame(() => {
+          successState.classList.add('is-visible');
+          resetBtn.focus({ preventScroll: true });
+        });
+      }, 190);
+    }
+
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      if (hpInput && hpInput.value.trim()) {
+        showSuccessState();
+        return;
+      }
+      let firstInvalid = null;
+
+      fields.forEach((f) => {
+        const val = f.input.value.trim();
+        let msg = '';
+        if (f.required && !val) {
+          msg = 'هذا الحقل مطلوب';
+        } else if (f.key === 'email' && val && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(val)) {
+          msg = 'أدخل بريدًا إلكترونيًا صحيحًا';
+        }
+        if (msg) {
+          const alertSpan = document.createElement('span');
+          alertSpan.setAttribute('role', 'alert');
+          alertSpan.textContent = msg;
+          f.err.replaceChildren(alertSpan);
+          f.input.setAttribute('aria-invalid', 'true');
+          f.input.setAttribute('aria-describedby', f.err.id);
+          if (f.key === 'phone' && phoneShell) phoneShell.classList.add('is-invalid');
+          if (!firstInvalid) firstInvalid = f.input;
+        } else {
+          clearFieldError(f);
+        }
+      });
+
+      if (firstInvalid) {
+        firstInvalid.focus();
+        return;
+      }
+
+      showSuccessState();
+    });
+
+    resetBtn.addEventListener('click', () => {
+      form.reset();
+      setSelectedCountry('eg');
+      fields.forEach((f) => {
+        clearFieldError(f);
+        syncFloatState(f.input);
+      });
+      updateCharCounter();
+      successState.classList.remove('is-visible');
+      successState.setAttribute('aria-hidden', 'true');
+      successState.setAttribute('inert', '');
+      formWrap.classList.remove('is-state-hidden');
+      formWrap.removeAttribute('aria-hidden');
+      formWrap.removeAttribute('inert');
+      document.getElementById('cf-name').focus({ preventScroll: true });
+    });
+  }
+
+  form.addEventListener('pointerdown', initContactInteractive, true);
+  form.addEventListener('focusin', initContactInteractive, true);
+  form.addEventListener('submit', initContactInteractive, true);
+
+  rafId = requestAnimationFrame(() => {
+    rafId = 0;
+    if ('requestIdleCallback' in window) {
+      idleId = window.requestIdleCallback(
+        () => {
+          idleId = 0;
+          initContactInteractive();
+        },
+        { timeout: 250 }
+      );
+    } else {
+      idleTimer = window.setTimeout(() => {
+        idleTimer = 0;
+        initContactInteractive();
+      }, 0);
+    }
+  });
+
+  registerCleanup(() => {
+    if (rafId) cancelAnimationFrame(rafId);
+    if (idleId && 'cancelIdleCallback' in window) window.cancelIdleCallback(idleId);
+    if (idleTimer) clearTimeout(idleTimer);
+    if (docClickWired && onDocClick) document.removeEventListener('click', onDocClick);
+    form.removeEventListener('pointerdown', initContactInteractive, true);
+    form.removeEventListener('focusin', initContactInteractive, true);
+    form.removeEventListener('submit', initContactInteractive, true);
+    clearTimeout(successTimer);
   });
 
   return 'تواصل معنا | سفريتي';

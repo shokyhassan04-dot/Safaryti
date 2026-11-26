@@ -93,6 +93,7 @@ function preloadContactMedia(includeCardPhoto) {
           href: cm.hmHref,
           imagesrcset: cm.hm,
           imagesizes: '100vw',
+          media: '(max-width: 767px)',
           fetchpriority: 'high',
         }
       : {
@@ -102,6 +103,7 @@ function preloadContactMedia(includeCardPhoto) {
           href: cm.hdHref,
           imagesrcset: cm.hd,
           imagesizes: '100vw',
+          media: '(min-width: 768px)',
           fetchpriority: 'high',
         }
   );
@@ -116,6 +118,7 @@ function preloadContactMedia(includeCardPhoto) {
             href: cm.pmHref,
             imagesrcset: cm.pm,
             imagesizes: '(min-width: 1024px) 480px, 92vw',
+            media: '(max-width: 767px)',
           }
         : {
             rel: 'preload',
@@ -124,8 +127,34 @@ function preloadContactMedia(includeCardPhoto) {
             href: cm.pdHref,
             imagesrcset: cm.pd,
             imagesizes: '(min-width: 1024px) 480px, 92vw',
+            media: '(min-width: 768px)',
           }
     );
+  }
+  const cb = window.__SAFARYTI_CONTACT_BOOT__;
+  if (cb && cb.js && !document.head.querySelector('link[data-c-mod="1"]')) {
+    for (let i = 0; i < cb.js.length; i++) {
+      const mLink = document.createElement('link');
+      mLink.setAttribute('data-c-mod', '1');
+      mLink.rel = 'modulepreload';
+      mLink.crossOrigin = '';
+      mLink.href = cb.js[i];
+      document.head.appendChild(mLink);
+    }
+  }
+  if (cb && cb.css && !document.head.querySelector('link[data-a-css="contact"]')) {
+    for (let i = 0; i < cb.css.length; i++) {
+      const cLink = document.createElement('link');
+      cLink.setAttribute('data-a-css', 'contact');
+      cLink.rel = 'preload';
+      cLink.as = 'style';
+      cLink.href = cb.css[i];
+      cLink.onload = function () {
+        this.onload = null;
+        this.rel = 'stylesheet';
+      };
+      document.head.appendChild(cLink);
+    }
   }
 }
 
@@ -423,7 +452,7 @@ export function prefetchRouteByHash(href) {
   else if (route.view === 'category') preloadCategoryMedia(route.param);
   else if (route.view === 'article') preloadArticleMedia(route.param);
   else if (route.view === 'privacy') preloadPrivacyMedia();
-  if (route.view !== 'search' && route.view !== 'culture' && route.view !== 'privacy') ensureSectionsBelowCss();
+  if (route.view !== 'search' && route.view !== 'culture' && route.view !== 'privacy' && route.view !== 'contact') ensureSectionsBelowCss();
   const loader = isTipsHubRoute(route) ? ROUTE_LOADERS.tips : ROUTE_LOADERS[route.view];
   if (loader) {
     loader().catch(() => {});
@@ -511,7 +540,7 @@ export function renderRoute(isInitial) {
   else if (route.view === 'category') preloadCategoryMedia(route.param);
   else if (route.view === 'article') preloadArticleMedia(route.param);
   else if (route.view === 'privacy') preloadPrivacyMedia();
-  if (route.view !== 'search' && route.view !== 'culture' && route.view !== 'privacy') ensureSectionsBelowCss();
+  if (route.view !== 'search' && route.view !== 'culture' && route.view !== 'privacy' && route.view !== 'contact') ensureSectionsBelowCss();
   setState({ currentView: route.view, route, activeSceneIndex: -1 });
   clearTimeout(routeTimer);
 
