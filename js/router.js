@@ -350,6 +350,54 @@ function preloadArticleMedia(param) {
   }
 }
 
+function preloadPrivacyMedia() {
+  if (typeof document === 'undefined' || !document.head) return;
+  const am = window.__SAFARYTI_ARCHIVE_MEDIA__;
+  const pb = window.__SAFARYTI_PRIVACY_BOOT__;
+  const isMob = !isTabletOrLargerLocal();
+  if (am && !document.head.querySelector('link[data-p-pre="hero"]')) {
+    const href = isMob ? am.hmHref : am.hdHref;
+    const srcset = isMob ? am.hm : am.hd;
+    if (href) {
+      const link = document.createElement('link');
+      link.setAttribute('data-p-pre', 'hero');
+      link.rel = 'preload';
+      link.as = 'image';
+      link.type = 'image/webp';
+      link.href = href;
+      if (srcset) link.setAttribute('imagesrcset', srcset);
+      link.setAttribute('imagesizes', '100vw');
+      link.setAttribute('media', isMob ? '(max-width: 767px)' : '(min-width: 768px)');
+      link.setAttribute('fetchpriority', 'high');
+      document.head.appendChild(link);
+    }
+  }
+  if (pb && pb.js && !document.head.querySelector('link[data-p-mod="1"]')) {
+    for (let i = 0; i < pb.js.length; i++) {
+      const mLink = document.createElement('link');
+      mLink.setAttribute('data-p-mod', '1');
+      mLink.rel = 'modulepreload';
+      mLink.crossOrigin = '';
+      mLink.href = pb.js[i];
+      document.head.appendChild(mLink);
+    }
+  }
+  if (pb && pb.css && !document.head.querySelector('link[data-a-css="priv"]')) {
+    for (let i = 0; i < pb.css.length; i++) {
+      const cLink = document.createElement('link');
+      cLink.setAttribute('data-a-css', 'priv');
+      cLink.rel = 'preload';
+      cLink.as = 'style';
+      cLink.href = pb.css[i];
+      cLink.onload = function () {
+        this.onload = null;
+        this.rel = 'stylesheet';
+      };
+      document.head.appendChild(cLink);
+    }
+  }
+}
+
 export function prefetchContactChunkIdle() {
   ROUTE_LOADERS.contact().catch(() => {});
 }
@@ -374,7 +422,8 @@ export function prefetchRouteByHash(href) {
   else if (route.view === 'all-stories') preloadArchiveMedia();
   else if (route.view === 'category') preloadCategoryMedia(route.param);
   else if (route.view === 'article') preloadArticleMedia(route.param);
-  if (route.view !== 'search' && route.view !== 'culture') ensureSectionsBelowCss();
+  else if (route.view === 'privacy') preloadPrivacyMedia();
+  if (route.view !== 'search' && route.view !== 'culture' && route.view !== 'privacy') ensureSectionsBelowCss();
   const loader = isTipsHubRoute(route) ? ROUTE_LOADERS.tips : ROUTE_LOADERS[route.view];
   if (loader) {
     loader().catch(() => {});
@@ -461,7 +510,8 @@ export function renderRoute(isInitial) {
   else if (route.view === 'all-stories') preloadArchiveMedia();
   else if (route.view === 'category') preloadCategoryMedia(route.param);
   else if (route.view === 'article') preloadArticleMedia(route.param);
-  if (route.view !== 'search' && route.view !== 'culture') ensureSectionsBelowCss();
+  else if (route.view === 'privacy') preloadPrivacyMedia();
+  if (route.view !== 'search' && route.view !== 'culture' && route.view !== 'privacy') ensureSectionsBelowCss();
   setState({ currentView: route.view, route, activeSceneIndex: -1 });
   clearTimeout(routeTimer);
 

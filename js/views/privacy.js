@@ -1,6 +1,7 @@
 import '../../css/routes/inner-shared.css';
 import '../../css/routes/privacy.css';
 import { IMG } from '../config.js';
+import { registerCleanup } from '../store.js';
 import { esc, isDesktopViewport } from '../utils.js';
 import { PRIVACY_DATA } from '../data/privacyData.js';
 import { activateAdSlots } from '../components/adSlots.js';
@@ -30,16 +31,32 @@ export function renderPrivacy(main) {
   main.innerHTML =
     renderInnerHeaderHtml({
       bgImage: IMG.heroBackdrop,
+      heroAsImg: true,
+      mobileSrc: './mobile/hero-backdrop-m.webp',
+      mobileWidth: 800,
+      mobileHeight: 447,
       leftHtml:
         '<h1 class="t-h1 no-auto-ads" tabindex="-1">سياسة الخصوصية</h1>' +
         '<nav class="breadcrumb" aria-label="مسار التنقل"><a href="#home">الرئيسية</a><span aria-hidden="true">›</span><span>سياسة الخصوصية</span></nav>',
     }) +
-    '<div class="container split-layout is-privacy">' +
-    '<div class="privacy-prose no-auto-ads">' +
-    bodyHtml +
-    '</div>' +
-    '</div>';
+    '<div class="container split-layout is-privacy" id="privacy-split-shell" style="min-height:1100px"></div>';
 
   activateAdSlots(main);
+
+  let rafId = requestAnimationFrame(() => {
+    rafId = 0;
+    const splitShell = document.getElementById('privacy-split-shell');
+    if (!splitShell) return;
+    splitShell.innerHTML = '<div class="privacy-prose no-auto-ads">' + bodyHtml + '</div>';
+    splitShell.style.minHeight = '';
+  });
+
+  registerCleanup(() => {
+    if (rafId) {
+      cancelAnimationFrame(rafId);
+      rafId = 0;
+    }
+  });
+
   return 'سياسة الخصوصية | سفريتي';
 }

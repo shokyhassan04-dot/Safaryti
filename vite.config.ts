@@ -20,7 +20,6 @@ export default defineConfig(() => {
   const rootDir = import.meta.dirname;
   let assetMap: Record<string, string> = {};
   let sectionsBelowHashed = '';
-  let extraModulePreloads: string[] = [];
   let deletedCssLiterals: string[] = [];
 
   const rewriteAssetUrl = (rawUrl: string, fromAssetsDir: boolean): string | null => {
@@ -66,7 +65,6 @@ export default defineConfig(() => {
         },
         async generateBundle(_outputOptions, bundle) {
           assetMap = {};
-          extraModulePreloads = [];
           sectionsBelowHashed = '';
           deletedCssLiterals = [];
 
@@ -163,12 +161,15 @@ export default defineConfig(() => {
           const tipsCssDeps = new Set<string>();
           const articleJsDeps = new Set<string>();
           const articleCssDeps = new Set<string>();
+          const privacyJsDeps = new Set<string>();
+          const privacyCssDeps = new Set<string>();
           let contactChunkFile = '';
           let searchChunkFile = '';
           let cultureChunkFile = '';
           let archiveChunkFile = '';
           let tipsChunkFile = '';
           let articleChunkFile = '';
+          let privacyChunkFile = '';
           let scrollChunkFile = '';
           for (const [fileName, item] of Object.entries(bundle)) {
             if (item.type === 'chunk') {
@@ -198,6 +199,9 @@ export default defineConfig(() => {
               }
               if (/^assets\/article-[^/]+\.js$/.test(fileName)) {
                 articleChunkFile = fileName;
+              }
+              if (/^assets\/privacy-[^/]+\.js$/.test(fileName)) {
+                privacyChunkFile = fileName;
               }
               if (/^assets\/scrollController-[^/]+\.js$/.test(fileName)) {
                 scrollChunkFile = fileName;
@@ -236,6 +240,8 @@ export default defineConfig(() => {
           collectChunkTree(scrollChunkFile, tipsJsDeps, tipsCssDeps);
           collectChunkTree(articleChunkFile, articleJsDeps, articleCssDeps);
           collectChunkTree(scrollChunkFile, articleJsDeps, articleCssDeps);
+          collectChunkTree(privacyChunkFile, privacyJsDeps, privacyCssDeps);
+          collectChunkTree(scrollChunkFile, privacyJsDeps, privacyCssDeps);
           const searchBoot = {
             js: Array.from(searchJsDeps).map((f) => './' + f),
             css: Array.from(searchCssDeps).map((f) => './' + f),
@@ -472,7 +478,11 @@ export default defineConfig(() => {
             c: catHeroMap,
             al: catAliasMap,
           };
-          extraModulePreloads = Array.from(homeDeps);
+          const privacyBoot = {
+            js: Array.from(privacyJsDeps).map((f) => './' + f),
+            css: Array.from(privacyCssDeps).map((f) => './' + f),
+          };
+          const homeBoot = Array.from(homeDeps).map((f) => './' + f);
 
           const htmlAsset = bundle['index.html'];
           if (htmlAsset && htmlAsset.type === 'asset' && typeof htmlAsset.source === 'string') {
@@ -544,22 +554,13 @@ export default defineConfig(() => {
               }
             );
 
-            // Inject modulepreload tags for initial Home chunks to eliminate serial waterfall
-            if (extraModulePreloads.length) {
-              const preloadTags = extraModulePreloads
-                .filter((dep) => !out.includes(dep))
-                .map((dep) => `  <link rel="modulepreload" crossorigin href="./${dep}">`)
-                .join('\n');
-              if (preloadTags) {
-                out = out.replace('</head>', () => `${preloadTags}\n</head>`);
-              }
-            }
-
             out = out.replace('/*__SAFARYTI_CONTACT_BOOT__*/null', () => JSON.stringify(contactBoot));
             out = out.replace('/*__SAFARYTI_SEARCH_BOOT__*/null', () => JSON.stringify(searchBoot));
             out = out.replace('/*__SAFARYTI_HUB_BOOT__*/null', () => JSON.stringify(hubBoot));
             out = out.replace('/*__SAFARYTI_ARCHIVE_BOOT__*/null', () => JSON.stringify(archiveBoot));
             out = out.replace('/*__SAFARYTI_ARTICLE_BOOT__*/null', () => JSON.stringify(articleBoot));
+            out = out.replace('/*__SAFARYTI_PRIVACY_BOOT__*/null', () => JSON.stringify(privacyBoot));
+            out = out.replace('/*__SAFARYTI_HOME_BOOT__*/null', () => JSON.stringify(homeBoot));
             out = out.replace('/*__SAFARYTI_BELOW_CSS__*/null', () => JSON.stringify(sectionsBelowHashed || ''));
             htmlAsset.source = out;
           }
