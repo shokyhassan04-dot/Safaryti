@@ -1,5 +1,5 @@
 import { registerCleanup } from '../store.js';
-import { esc, isReducedMotion } from '../utils.js';
+import { esc, isDesktopViewport, isReducedMotion } from '../utils.js';
 
 export function renderArticleTocNavHtml(tocItems, options) {
   const showTrack = !options || options.showTrack !== false;
@@ -47,7 +47,7 @@ export function initArticleToc(main) {
   let activeHeadingId = null;
 
   function syncAsideTocMaxHeight() {
-    if (!asideTocScroll) return;
+    if (!asideTocScroll || !isDesktopViewport()) return;
     const items = asideTocScroll.querySelectorAll('.article-toc-item');
     if (items.length > 4) {
       const fourth = items[3];
@@ -61,6 +61,7 @@ export function initArticleToc(main) {
   }
 
   function positionTocMarkers(id, scrollIntoAside) {
+    if (!isDesktopViewport() && !(mobileTocDetails && mobileTocDetails.open)) return;
     const updates = [];
     tocNavs.forEach((nav) => {
       const marker = nav.querySelector('.article-toc-marker');
@@ -171,10 +172,24 @@ export function initArticleToc(main) {
   const headings = uniqueIds.map((id) => document.getElementById(id)).filter(Boolean);
 
   if (headings.length) {
-    syncAsideTocMaxHeight();
-    setActiveTocHeading(headings[0].id, false);
+    activeHeadingId = headings[0].id;
+    tocLinks.forEach((l) => {
+      const isMatch = l.getAttribute('data-target') === activeHeadingId;
+      l.classList.toggle('is-active', isMatch);
+      if (isMatch) l.setAttribute('aria-current', 'location');
+      else l.removeAttribute('aria-current');
+    });
+    let tocInitRaf = requestAnimationFrame(() => {
+      tocInitRaf = null;
+      syncAsideTocMaxHeight();
+      if (activeHeadingId) positionTocMarkers(activeHeadingId, false);
+    });
+    registerCleanup(() => {
+      if (tocInitRaf !== null) cancelAnimationFrame(tocInitRaf);
+    });
     if (document.fonts && document.fonts.ready) {
       document.fonts.ready.then(() => {
+        if (!isDesktopViewport()) return;
         syncAsideTocMaxHeight();
         if (activeHeadingId) positionTocMarkers(activeHeadingId, false);
       });

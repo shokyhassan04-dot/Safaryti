@@ -1,6 +1,6 @@
 import { CONFIG } from '../config.js';
 import { registerCleanup } from '../store.js';
-import { esc, isReducedMotion, isMobileViewport, arrowLeftSvg, arrowRightSvg, renderPictureHtml } from '../utils.js';
+import { esc, isReducedMotion, isMobileViewport, isDesktopViewport, arrowLeftSvg, arrowRightSvg, renderPictureHtml } from '../utils.js';
 import { hydrateLazyMedia } from '../utils/viewHelpers.js';
 
 export function renderAsideFactsCardHtml() {
@@ -126,24 +126,31 @@ export function initFactsCarouselWidget() {
       let factImgRaf2 = null;
 
       function syncAsideClampToggles() {
-        if (!asideCard.isConnected || asideCard.offsetParent === null) return;
+        if (!asideCard.isConnected || asideCard.clientWidth <= 0) return;
         const items = [];
+        let anyExpanded = false;
         aSlides.forEach((slide) => {
           const textEl = slide.querySelector('.aside-fact-text');
           const moreBtn = slide.querySelector('.aside-fact-more-btn');
           if (!textEl || !moreBtn) return;
           const wasExpanded = slide.classList.contains('is-expanded');
-          if (wasExpanded) slide.classList.remove('is-expanded');
+          if (wasExpanded) anyExpanded = true;
           items.push({ slide, textEl, moreBtn, wasExpanded });
         });
+        if (!items.length) return;
+        if (anyExpanded) {
+          items.forEach((it) => {
+            if (it.wasExpanded) it.slide.classList.remove('is-expanded');
+          });
+        }
         const clamps = items.map((it) => it.textEl.scrollHeight > it.textEl.clientHeight + 2);
         items.forEach((it, idx) => {
           const needsClamp = clamps[idx];
           if (it.wasExpanded && needsClamp) it.slide.classList.add('is-expanded');
-          it.moreBtn.hidden = !needsClamp;
+          if (it.moreBtn.hidden !== !needsClamp) it.moreBtn.hidden = !needsClamp;
           if (!needsClamp) {
             it.moreBtn.setAttribute('aria-expanded', 'false');
-            it.moreBtn.textContent = 'اقرأ المزيد';
+            if (it.moreBtn.textContent !== 'اقرأ المزيد') it.moreBtn.textContent = 'اقرأ المزيد';
           }
         });
       }
@@ -265,7 +272,11 @@ export function initFactsCarouselWidget() {
 
       const onAsideVis = () => { syncAsideFactsTimer(); };
       let asideResizeRaf = null;
+      let clampInitRaf = null;
+      let clampIo = null;
+      let hasEnteredClampZone = isDesktopViewport() || !('IntersectionObserver' in window);
       const onAsideResize = () => {
+        if (!isDesktopViewport() && !hasEnteredClampZone) return;
         if (asideResizeRaf === null) {
           asideResizeRaf = requestAnimationFrame(() => {
             asideResizeRaf = null;
@@ -275,19 +286,40 @@ export function initFactsCarouselWidget() {
       };
       document.addEventListener('visibilitychange', onAsideVis);
       window.addEventListener('resize', onAsideResize, { passive: true });
-      let clampInitRaf = requestAnimationFrame(() => {
-        clampInitRaf = null;
-        syncAsideClampToggles();
-      });
+      if (hasEnteredClampZone) {
+        clampInitRaf = requestAnimationFrame(() => {
+          clampInitRaf = null;
+          syncAsideClampToggles();
+        });
+      } else {
+        clampIo = new IntersectionObserver(
+          (entries) => {
+            if (entries.some((en) => en.isIntersecting)) {
+              hasEnteredClampZone = true;
+              clampIo.disconnect();
+              clampIo = null;
+              clampInitRaf = requestAnimationFrame(() => {
+                clampInitRaf = null;
+                syncAsideClampToggles();
+              });
+            }
+          },
+          { rootMargin: '300px 0px' }
+        );
+        clampIo.observe(asideCard);
+      }
       if (document.fonts && document.fonts.ready) {
         document.fonts.ready.then(() => {
-          if (asideCard.isConnected) requestAnimationFrame(syncAsideClampToggles);
+          if (asideCard.isConnected && (isDesktopViewport() || hasEnteredClampZone)) {
+            requestAnimationFrame(syncAsideClampToggles);
+          }
         });
       }
       hydrateFactWindow(aIdx);
       syncAsideFactsTimer();
       registerCleanup(() => {
         clearInterval(aTimer);
+        if (clampIo) clampIo.disconnect();
         if (clampInitRaf !== null) cancelAnimationFrame(clampInitRaf);
         if (factImgRaf1 !== null) cancelAnimationFrame(factImgRaf1);
         if (factImgRaf2 !== null) cancelAnimationFrame(factImgRaf2);

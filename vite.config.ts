@@ -161,11 +161,14 @@ export default defineConfig(() => {
           const archiveCssDeps = new Set<string>();
           const tipsJsDeps = new Set<string>();
           const tipsCssDeps = new Set<string>();
+          const articleJsDeps = new Set<string>();
+          const articleCssDeps = new Set<string>();
           let contactChunkFile = '';
           let searchChunkFile = '';
           let cultureChunkFile = '';
           let archiveChunkFile = '';
           let tipsChunkFile = '';
+          let articleChunkFile = '';
           let scrollChunkFile = '';
           for (const [fileName, item] of Object.entries(bundle)) {
             if (item.type === 'chunk') {
@@ -192,6 +195,9 @@ export default defineConfig(() => {
               }
               if (/^assets\/tips-[^/]+\.js$/.test(fileName)) {
                 tipsChunkFile = fileName;
+              }
+              if (/^assets\/article-[^/]+\.js$/.test(fileName)) {
+                articleChunkFile = fileName;
               }
               if (/^assets\/scrollController-[^/]+\.js$/.test(fileName)) {
                 scrollChunkFile = fileName;
@@ -228,6 +234,8 @@ export default defineConfig(() => {
           collectChunkTree(scrollChunkFile, archiveJsDeps, archiveCssDeps);
           collectChunkTree(tipsChunkFile, tipsJsDeps, tipsCssDeps);
           collectChunkTree(scrollChunkFile, tipsJsDeps, tipsCssDeps);
+          collectChunkTree(articleChunkFile, articleJsDeps, articleCssDeps);
+          collectChunkTree(scrollChunkFile, articleJsDeps, articleCssDeps);
           const searchBoot = {
             js: Array.from(searchJsDeps).map((f) => './' + f),
             css: Array.from(searchCssDeps).map((f) => './' + f),
@@ -339,22 +347,36 @@ export default defineConfig(() => {
               if (rawKey && rawKey !== m[3]) catAliasMap[rawKey] = m[3];
             }
           }
-          const buildCatHeroEntry = (imgKey: string) => {
+          const portrait896Set = new Set([
+            'about_temple_pillars_1794996471329',
+            'contact_temple_traveler_1795429682873',
+          ]);
+          const buildHeroEntry = (imgKey: string, mobFile: string, mobW: number) => {
             const rawImg = imgVarMap[imgKey];
-            const mob = catMobByImgKey[imgKey];
-            if (!rawImg || !mob) return null;
+            if (!rawImg || !mobFile) return null;
             const stem = path.posix.basename(rawImg, path.posix.extname(rawImg));
             const baseKey = 'src/assets/images/' + stem;
-            const has1120 = Boolean(assetMap[baseKey + '-1120w.webp']);
-            const widths = has1120 ? [240, 480, 800, 1120] : [240, 480, 800];
-            const fullW = has1120 ? 1376 : 1200;
+            let widths: number[];
+            let fullW: number;
+            if (portrait896Set.has(stem)) {
+              widths = [240, 480, 640, 760];
+              fullW = 896;
+            } else {
+              const has1120 = Boolean(assetMap[baseKey + '-1120w.webp']);
+              widths = has1120 ? [240, 480, 800, 1120] : [240, 480, 800];
+              fullW = has1120 ? 1376 : 1200;
+            }
             const hdHref = assetMap[baseKey + '.webp'] || './' + baseKey + '.webp';
             const hd = widths
               .map((w) => (assetMap[baseKey + '-' + w + 'w.webp'] || './' + baseKey + '-' + w + 'w.webp') + ' ' + w + 'w')
               .concat([hdHref + ' ' + fullW + 'w'])
               .join(', ');
-            const hmHref = assetMap[mob.file] || './' + mob.file;
-            return { hm: hmHref + ' ' + mob.w + 'w', hmHref, hd, hdHref };
+            const hmHref = assetMap[mobFile] || './' + mobFile;
+            return { hm: hmHref + ' ' + mobW + 'w', hmHref, hd, hdHref };
+          };
+          const buildCatHeroEntry = (imgKey: string) => {
+            const mob = catMobByImgKey[imgKey];
+            return mob ? buildHeroEntry(imgKey, mob.file, mob.w) : null;
           };
           for (const blockName of ['regions', 'themes']) {
             const bm = cfgSrc.match(new RegExp(blockName + ':\\s*\\[([\\s\\S]*?)\\],'));
@@ -365,6 +387,68 @@ export default defineConfig(() => {
               if (entry) catHeroMap[itemM[1]] = entry;
             }
           }
+
+          const articleExtraMob: Record<string, { file: string; w: number }> = {
+            marsa: { file: 'mobile/hero-marsa-m.webp', w: 780 },
+            pillars: { file: 'mobile/hero-pillars-m.webp', w: 560 },
+            taba: { file: 'mobile/art-taba-m.webp', w: 640 },
+            sphinx: { file: 'mobile/art-sphinx-m.webp', w: 640 },
+            foodEgyptian: { file: 'mobile/art-food-egyptian-m.webp', w: 640 },
+            foodSudanese: { file: 'mobile/art-food-sudanese-m.webp', w: 560 },
+            foodWorld: { file: 'mobile/art-food-world-m.webp', w: 560 },
+            aboutHeroPlane: { file: 'src/assets/images/about_plane_sunset_roof_1795352382468-800w.webp', w: 800 },
+          };
+          const articleImgKeyToBootKey: Record<string, string> = {
+            asia: 'asia',
+            suez: 'africa',
+            europe: 'europe',
+            na: 'north-america',
+            sa: 'south-america',
+            oceania: 'australia',
+            pyramids: 'heritage',
+            heroAd2: 'food',
+            expand: 'tips',
+            aboutWing: 'trip-planning',
+            heroAd1: 'travel-safety',
+            heroBackdrop: 'backdrop',
+            marsa: 'marsa',
+            pillars: 'pillars',
+            taba: 'taba',
+            sphinx: 'sphinx',
+            foodEgyptian: 'foodEgyptian',
+            foodSudanese: 'foodSudanese',
+            foodWorld: 'foodWorld',
+            aboutHeroPlane: 'aboutHeroPlane',
+          };
+          const articleExtraHeroMap: Record<string, { hm: string; hmHref: string; hd: string; hdHref: string }> = {};
+          for (const [k, mob] of Object.entries(articleExtraMob)) {
+            const entry = buildHeroEntry(k, mob.file, mob.w);
+            if (entry) articleExtraHeroMap[k] = entry;
+          }
+          const articleSlugMap: Record<string, string> = {};
+          const seenArticleTitles = new Set<string>();
+          for (const blockName of ['stories', 'picks', 'popular']) {
+            const bm = cfgSrc.match(new RegExp(blockName + ':\\s*\\[([\\s\\S]*?)\\n\\s*\\],'));
+            if (!bm) continue;
+            for (const itemM of bm[1].matchAll(
+              /\{\s*id:\s*'([^']+)'[^}]*\btitle:\s*'([^']+)'[^}]*\bimage:\s*IMG\.(\w+)[^}]*\}/g
+            )) {
+              const id = itemM[1];
+              const title = itemM[2];
+              const imgKey = itemM[3];
+              if (seenArticleTitles.has(title)) continue;
+              seenArticleTitles.add(title);
+              articleSlugMap[id] = articleImgKeyToBootKey[imgKey] || 'backdrop';
+            }
+          }
+          if (!articleSlugMap['suez-landmarks']) articleSlugMap['suez-landmarks'] = 'africa';
+
+          const articleBoot = {
+            js: Array.from(articleJsDeps).map((f) => './' + f),
+            css: Array.from(articleCssDeps).map((f) => './' + f),
+            s: articleSlugMap,
+            m: articleExtraHeroMap,
+          };
 
           const archiveBoot = {
             js: Array.from(archiveJsDeps).map((f) => './' + f),
@@ -475,6 +559,7 @@ export default defineConfig(() => {
             out = out.replace('/*__SAFARYTI_SEARCH_BOOT__*/null', () => JSON.stringify(searchBoot));
             out = out.replace('/*__SAFARYTI_HUB_BOOT__*/null', () => JSON.stringify(hubBoot));
             out = out.replace('/*__SAFARYTI_ARCHIVE_BOOT__*/null', () => JSON.stringify(archiveBoot));
+            out = out.replace('/*__SAFARYTI_ARTICLE_BOOT__*/null', () => JSON.stringify(articleBoot));
             out = out.replace('/*__SAFARYTI_BELOW_CSS__*/null', () => JSON.stringify(sectionsBelowHashed || ''));
             htmlAsset.source = out;
           }

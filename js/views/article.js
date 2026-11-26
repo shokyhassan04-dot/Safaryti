@@ -5,6 +5,7 @@ import { registerCleanup } from '../store.js';
 import {
   esc,
   formatArabicDate,
+  isMobileViewport,
   isReducedMotion,
   renderPictureHtml,
 } from '../utils.js';
@@ -14,6 +15,29 @@ import { renderAdSlotHtml, activateAdSlots } from '../components/adSlots.js';
 import { renderInnerHeaderHtml } from '../components/innerHeader.js';
 import { renderArticleAsideHtml, wireSharedAsideWidgets } from '../components/sharedAside.js';
 import { renderArticleTocNavHtml, initArticleToc } from '../components/articleToc.js';
+
+const ARTICLE_MOBILE_HERO = {
+  [IMG.asia]: { src: './mobile/cat-asia-m.webp', w: 800, h: 447 },
+  [IMG.suez]: { src: './mobile/cat-africa-m.webp', w: 800, h: 447 },
+  [IMG.europe]: { src: './mobile/cat-europe-m.webp', w: 640, h: 357 },
+  [IMG.na]: { src: './mobile/cat-na-m.webp', w: 640, h: 357 },
+  [IMG.sa]: { src: './mobile/cat-sa-m.webp', w: 640, h: 357 },
+  [IMG.oceania]: { src: './mobile/cat-oceania-m.webp', w: 640, h: 357 },
+  [IMG.heroAd2]: { src: './mobile/cat-food-m.webp', w: 640, h: 478 },
+  [IMG.pyramids]: { src: './mobile/cat-heritage-m.webp', w: 640, h: 478 },
+  [IMG.expand]: { src: './mobile/cat-tips-m.webp', w: 800, h: 447 },
+  [IMG.aboutWing]: { src: './mobile/cat-planning-m.webp', w: 800, h: 597 },
+  [IMG.heroAd1]: { src: './mobile/cat-safety-m.webp', w: 560, h: 418 },
+  [IMG.heroBackdrop]: { src: './mobile/hero-backdrop-m.webp', w: 800, h: 447 },
+  [IMG.marsa]: { src: './mobile/hero-marsa-m.webp', w: 780, h: 435 },
+  [IMG.pillars]: { src: './mobile/hero-pillars-m.webp', w: 560, h: 750 },
+  [IMG.taba]: { src: './mobile/art-taba-m.webp', w: 640, h: 357 },
+  [IMG.sphinx]: { src: './mobile/art-sphinx-m.webp', w: 640, h: 478 },
+  [IMG.foodEgyptian]: { src: './mobile/art-food-egyptian-m.webp', w: 640, h: 357 },
+  [IMG.foodSudanese]: { src: './mobile/art-food-sudanese-m.webp', w: 560, h: 313 },
+  [IMG.foodWorld]: { src: './mobile/art-food-world-m.webp', w: 560, h: 313 },
+  [IMG.aboutHeroPlane]: { src: './src/assets/images/about_plane_sunset_roof_1795352382468-800w.webp', w: 800, h: 447 },
+};
 
 export function renderArticle(main, slug) {
   const art = findArticleById(slug);
@@ -116,11 +140,12 @@ export function renderArticle(main, slug) {
     esc(CONFIG.assets.logo) +
     '" alt="" decoding="async" onerror="window.__safarytiLogoFallback&&window.__safarytiLogoFallback(this,true)">' +
     '</div>';
+  const isMob = isMobileViewport();
   const heroPhotoHtml = art.image
     ? renderPictureHtml(art.image, {
         alt: heroAlt,
         cls: 'article-hero-photo',
-        fetchpriority: 'high',
+        fetchpriority: isMob ? '' : 'high',
         decoding: 'async',
         sizes: '(min-width: 1024px) 755px, 100vw',
       })
@@ -224,10 +249,16 @@ export function renderArticle(main, slug) {
   }
 
   const heroEnteringCls = isReducedMotion() ? '' : ' is-entering';
+  const headerBg = art.image || IMG.heroBackdrop;
+  const mobHero = ARTICLE_MOBILE_HERO[headerBg] || null;
 
   main.innerHTML =
     renderInnerHeaderHtml({
-      bgImage: art.image || IMG.heroBackdrop,
+      bgImage: headerBg,
+      heroAsImg: Boolean(mobHero),
+      mobileSrc: mobHero ? mobHero.src : '',
+      mobileWidth: mobHero ? mobHero.w : 800,
+      mobileHeight: mobHero ? mobHero.h : 447,
       leftHtml:
         '<h1 class="t-h1 article-hero-title no-auto-ads" tabindex="-1">' +
         esc(art.title) +
@@ -238,94 +269,9 @@ export function renderArticle(main, slug) {
         esc(art.category) +
         '</a></nav>',
     }) +
-    '<div class="container split-layout is-article">' +
-    '<article class="article-prose">' +
-    '<header class="article-hero-card on-dark no-auto-ads' +
-    heroEnteringCls +
-    '" id="article-hero-card">' +
-    heroPhotoHtml +
-    '<div class="article-hero-scrim" aria-hidden="true"></div>' +
-    '<h2 class="article-hero-heading no-auto-ads">' +
-    esc(art.title) +
-    '</h2>' +
-    '<div class="article-hero-meta">' +
-    heroMetaItemsHtml +
-    '</div>' +
-    '</header>' +
-    '<div class="article-body-row">' +
-    '<div class="article-body-content">' +
-    introHtml +
-    tocMobileHtml +
-    sectionsHtml +
-    '</div>' +
-    shareRailHtml +
-    '</div>' +
-    relatedHtml +
-    '</article>' +
-    renderArticleAsideHtml(tocAsideHtml) +
-    '</div>';
+    '<div class="container split-layout is-article" id="article-split-shell" style="min-height:1100px"></div>';
 
   activateAdSlots(main);
-  wireSharedAsideWidgets(main);
-
-  // Hero image error fallback & dynamic height guard
-  const heroCardEl = document.getElementById('article-hero-card');
-  if (heroCardEl) {
-    const heroImgEl = heroCardEl.querySelector('.article-hero-photo');
-    if (heroImgEl) {
-      heroImgEl.addEventListener(
-        'error',
-        () => {
-          const fb = document.createElement('div');
-          fb.className = 'article-hero-fallback';
-          fb.setAttribute('aria-hidden', 'true');
-          fb.innerHTML =
-            '<img src="' +
-            esc(CONFIG.assets.logo) +
-            '" alt="" decoding="async" onerror="window.__safarytiLogoFallback&&window.__safarytiLogoFallback(this,true)">';
-          (heroImgEl.closest('picture') || heroImgEl).replaceWith(fb);
-        },
-        { once: true }
-      );
-    }
-    let heroMinRaf = null;
-    const adjustHeroMinHeight = () => {
-      const h1El = heroCardEl.querySelector('.article-hero-heading');
-      const metaEl = heroCardEl.querySelector('.article-hero-meta');
-      if (!h1El || !metaEl) return;
-      const hadCustomMin = Boolean(heroCardEl.style.minHeight);
-      if (hadCustomMin) heroCardEl.style.minHeight = '';
-      const needed = Math.ceil(h1El.offsetHeight + metaEl.offsetHeight + 84);
-      const currentMin = heroCardEl.getBoundingClientRect().height;
-      if (needed > currentMin) {
-        heroCardEl.style.minHeight = needed + 'px';
-      }
-    };
-    const scheduleHeroMinHeight = () => {
-      if (heroMinRaf === null) {
-        heroMinRaf = requestAnimationFrame(() => {
-          heroMinRaf = null;
-          adjustHeroMinHeight();
-        });
-      }
-    };
-    scheduleHeroMinHeight();
-    window.addEventListener('resize', scheduleHeroMinHeight, { passive: true });
-    registerCleanup(() => {
-      if (heroMinRaf !== null) cancelAnimationFrame(heroMinRaf);
-      window.removeEventListener('resize', scheduleHeroMinHeight);
-    });
-  }
-
-  // FAQ accordion (preserved wiring if FAQ items exist)
-  main.querySelectorAll('[data-faq-item]').forEach((item) => {
-    const btn = item.querySelector('.faq-trigger');
-    if (!btn) return;
-    btn.addEventListener('click', () => {
-      const open = item.classList.toggle('is-open');
-      btn.setAttribute('aria-expanded', open ? 'true' : 'false');
-    });
-  });
 
   function copyCurrentUrl() {
     const url = window.location.href;
@@ -346,42 +292,140 @@ export function renderArticle(main, slug) {
     }
   }
 
-  const railCopyBtn = document.getElementById('article-rail-copy');
-  const railCopyTip = document.getElementById('article-rail-copy-tip');
-  let railCopyTimer = null;
-  if (railCopyBtn && railCopyTip) {
-    railCopyBtn.addEventListener('click', () => {
-      copyCurrentUrl();
-      clearTimeout(railCopyTimer);
-      railCopyTip.textContent = 'تم النسخ';
-      railCopyTip.classList.add('is-visible');
-      railCopyTimer = setTimeout(() => {
-        railCopyTip.classList.remove('is-visible');
-        railCopyTip.textContent = '';
-      }, 2000);
-    });
-    registerCleanup(() => {
-      clearTimeout(railCopyTimer);
-    });
-  }
+  let bodyMountRaf = requestAnimationFrame(() => {
+    bodyMountRaf = null;
+    const splitShell = document.getElementById('article-split-shell');
+    if (!splitShell || !splitShell.isConnected) return;
+    splitShell.innerHTML =
+      '<article class="article-prose">' +
+      '<header class="article-hero-card on-dark no-auto-ads' +
+      heroEnteringCls +
+      '" id="article-hero-card">' +
+      heroPhotoHtml +
+      '<div class="article-hero-scrim" aria-hidden="true"></div>' +
+      '<h2 class="article-hero-heading no-auto-ads">' +
+      esc(art.title) +
+      '</h2>' +
+      '<div class="article-hero-meta">' +
+      heroMetaItemsHtml +
+      '</div>' +
+      '</header>' +
+      '<div class="article-body-row">' +
+      '<div class="article-body-content">' +
+      introHtml +
+      tocMobileHtml +
+      sectionsHtml +
+      '</div>' +
+      shareRailHtml +
+      '</div>' +
+      relatedHtml +
+      '</article>' +
+      renderArticleAsideHtml(tocAsideHtml);
+    splitShell.style.minHeight = '';
 
-  const copyBtn = document.getElementById('copy-article-link');
-  let copyTimer = null;
-  if (copyBtn) {
-    copyBtn.addEventListener('click', () => {
-      copyCurrentUrl();
-      copyBtn.textContent = 'تم النسخ';
-      clearTimeout(copyTimer);
-      copyTimer = setTimeout(() => {
-        copyBtn.textContent = 'نسخ الرابط';
-      }, 2000);
-    });
-    registerCleanup(() => {
-      clearTimeout(copyTimer);
-    });
-  }
+    activateAdSlots(splitShell);
+    wireSharedAsideWidgets(splitShell);
 
-  initArticleToc(main);
+    // Hero image error fallback & dynamic height guard
+    const heroCardEl = document.getElementById('article-hero-card');
+    if (heroCardEl) {
+      const heroImgEl = heroCardEl.querySelector('.article-hero-photo');
+      if (heroImgEl) {
+        heroImgEl.addEventListener(
+          'error',
+          () => {
+            const fb = document.createElement('div');
+            fb.className = 'article-hero-fallback';
+            fb.setAttribute('aria-hidden', 'true');
+            fb.innerHTML =
+              '<img src="' +
+              esc(CONFIG.assets.logo) +
+              '" alt="" decoding="async" onerror="window.__safarytiLogoFallback&&window.__safarytiLogoFallback(this,true)">';
+            (heroImgEl.closest('picture') || heroImgEl).replaceWith(fb);
+          },
+          { once: true }
+        );
+      }
+      let heroMinRaf = null;
+      const adjustHeroMinHeight = () => {
+        const h1El = heroCardEl.querySelector('.article-hero-heading');
+        const metaEl = heroCardEl.querySelector('.article-hero-meta');
+        if (!h1El || !metaEl) return;
+        const hadCustomMin = Boolean(heroCardEl.style.minHeight);
+        if (hadCustomMin) heroCardEl.style.minHeight = '';
+        const needed = Math.ceil(h1El.offsetHeight + metaEl.offsetHeight + 84);
+        const currentMin = heroCardEl.getBoundingClientRect().height;
+        if (needed > currentMin) {
+          heroCardEl.style.minHeight = needed + 'px';
+        }
+      };
+      const scheduleHeroMinHeight = () => {
+        if (heroMinRaf === null) {
+          heroMinRaf = requestAnimationFrame(() => {
+            heroMinRaf = null;
+            adjustHeroMinHeight();
+          });
+        }
+      };
+      scheduleHeroMinHeight();
+      window.addEventListener('resize', scheduleHeroMinHeight, { passive: true });
+      registerCleanup(() => {
+        if (heroMinRaf !== null) cancelAnimationFrame(heroMinRaf);
+        window.removeEventListener('resize', scheduleHeroMinHeight);
+      });
+    }
+
+    // FAQ accordion (preserved wiring if FAQ items exist)
+    splitShell.querySelectorAll('[data-faq-item]').forEach((item) => {
+      const btn = item.querySelector('.faq-trigger');
+      if (!btn) return;
+      btn.addEventListener('click', () => {
+        const open = item.classList.toggle('is-open');
+        btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+      });
+    });
+
+    const railCopyBtn = document.getElementById('article-rail-copy');
+    const railCopyTip = document.getElementById('article-rail-copy-tip');
+    let railCopyTimer = null;
+    if (railCopyBtn && railCopyTip) {
+      railCopyBtn.addEventListener('click', () => {
+        copyCurrentUrl();
+        clearTimeout(railCopyTimer);
+        railCopyTip.textContent = 'تم النسخ';
+        railCopyTip.classList.add('is-visible');
+        railCopyTimer = setTimeout(() => {
+          railCopyTip.classList.remove('is-visible');
+          railCopyTip.textContent = '';
+        }, 2000);
+      });
+      registerCleanup(() => {
+        clearTimeout(railCopyTimer);
+      });
+    }
+
+    const copyBtn = document.getElementById('copy-article-link');
+    let copyTimer = null;
+    if (copyBtn) {
+      copyBtn.addEventListener('click', () => {
+        copyCurrentUrl();
+        copyBtn.textContent = 'تم النسخ';
+        clearTimeout(copyTimer);
+        copyTimer = setTimeout(() => {
+          copyBtn.textContent = 'نسخ الرابط';
+        }, 2000);
+      });
+      registerCleanup(() => {
+        clearTimeout(copyTimer);
+      });
+    }
+
+    initArticleToc(main);
+  });
+
+  registerCleanup(() => {
+    if (bodyMountRaf !== null) cancelAnimationFrame(bodyMountRaf);
+  });
 
   return art.title + ' | سفريتي';
 }

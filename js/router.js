@@ -289,6 +289,67 @@ function preloadCategoryMedia(param) {
   }
 }
 
+function preloadArticleMedia(param) {
+  if (typeof document === 'undefined' || !document.head) return;
+  const artB = window.__SAFARYTI_ARTICLE_BOOT__;
+  const ab = window.__SAFARYTI_ARCHIVE_BOOT__;
+  const am = window.__SAFARYTI_ARCHIVE_MEDIA__;
+  const artSlug = String(param || '').trim();
+  const artKey = (artB && artB.s && artB.s[artSlug]) || 'africa';
+  const artM =
+    (artB && artB.m && artB.m[artKey]) ||
+    (ab && ab.c && ab.c[artKey]) ||
+    (artKey === 'backdrop' ? am : ab && ab.c && ab.c.africa) ||
+    am;
+  const isMob = !isTabletOrLargerLocal();
+  if (artM) {
+    const href = isMob ? artM.hmHref : artM.hdHref;
+    const srcset = isMob ? artM.hm : artM.hd;
+    const preKey = 'hero-' + artKey;
+    if (
+      href &&
+      !document.head.querySelector('link[data-art-pre="hero"]') &&
+      !document.head.querySelector('link[data-art-pre="' + preKey + '"]')
+    ) {
+      const link = document.createElement('link');
+      link.setAttribute('data-art-pre', preKey);
+      link.rel = 'preload';
+      link.as = 'image';
+      link.type = 'image/webp';
+      link.href = href;
+      if (srcset) link.setAttribute('imagesrcset', srcset);
+      link.setAttribute('imagesizes', '100vw');
+      link.setAttribute('media', isMob ? '(max-width: 767px)' : '(min-width: 768px)');
+      link.setAttribute('fetchpriority', 'high');
+      document.head.appendChild(link);
+    }
+  }
+  if (artB && artB.js && !document.head.querySelector('link[data-art-mod="1"]')) {
+    for (let i = 0; i < artB.js.length; i++) {
+      const mLink = document.createElement('link');
+      mLink.setAttribute('data-art-mod', '1');
+      mLink.rel = 'modulepreload';
+      mLink.crossOrigin = '';
+      mLink.href = artB.js[i];
+      document.head.appendChild(mLink);
+    }
+  }
+  if (artB && artB.css && !document.head.querySelector('link[data-a-css="art"]')) {
+    for (let i = 0; i < artB.css.length; i++) {
+      const cLink = document.createElement('link');
+      cLink.setAttribute('data-a-css', 'art');
+      cLink.rel = 'preload';
+      cLink.as = 'style';
+      cLink.href = artB.css[i];
+      cLink.onload = function () {
+        this.onload = null;
+        this.rel = 'stylesheet';
+      };
+      document.head.appendChild(cLink);
+    }
+  }
+}
+
 export function prefetchContactChunkIdle() {
   ROUTE_LOADERS.contact().catch(() => {});
 }
@@ -312,6 +373,7 @@ export function prefetchRouteByHash(href) {
   else if (route.view === 'culture' || route.view === 'discover') preloadHubMedia(route.view);
   else if (route.view === 'all-stories') preloadArchiveMedia();
   else if (route.view === 'category') preloadCategoryMedia(route.param);
+  else if (route.view === 'article') preloadArticleMedia(route.param);
   if (route.view !== 'search' && route.view !== 'culture') ensureSectionsBelowCss();
   const loader = isTipsHubRoute(route) ? ROUTE_LOADERS.tips : ROUTE_LOADERS[route.view];
   if (loader) {
@@ -398,6 +460,7 @@ export function renderRoute(isInitial) {
   else if (route.view === 'culture' || route.view === 'discover') preloadHubMedia(route.view);
   else if (route.view === 'all-stories') preloadArchiveMedia();
   else if (route.view === 'category') preloadCategoryMedia(route.param);
+  else if (route.view === 'article') preloadArticleMedia(route.param);
   if (route.view !== 'search' && route.view !== 'culture') ensureSectionsBelowCss();
   setState({ currentView: route.view, route, activeSceneIndex: -1 });
   clearTimeout(routeTimer);
